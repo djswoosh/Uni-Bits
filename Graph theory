@@ -1,0 +1,113 @@
+#i graph tutorial
+
+install.packages("igraph")
+install.packages("dplyr")
+library(igraph)
+library(dplyr)
+
+
+#using basic graph function (undirected)
+
+g1 <- graph(edges=c(1,2, 2,3, 3, 1), n=3, directed=FALSE)
+plot(g1)
+V(g1) #where v is fore vertices(nodes)
+E(g1) #Wehre E is for Edges (connections)
+
+
+#using basic graph fucntion (directed)
+
+g2 <- graph( edges=c(1,2, 2,3, 3, 1), n=5, directed=TRUE )
+plot(g2)
+V(g2)
+E(g2)
+
+#using the formula fucntion
+g3 <- graph.formula(1-2, 1-3, 2-3, 2-4, 3-5, 4-5, 4-6, 4-7)
+V(g3)
+E(g3)
+plot(g3)
+
+
+#using formula for directed graph
+g4 <- graph.formula(1-+2, 1-+3, 2++3)
+plot(g4)
+V(g4)
+E(g4)
+
+
+#using formula with names for directed graph
+
+g5 <- graph.formula(ken-+mark, ken-+amal, mark++amal)
+plot(g5)
+V(g5)
+E(g5)
+
+
+#the adjacency matrix contains the connectivity patterns
+get.adjacency(g5)
+#you can get the "names" of the vertices (nodes)
+V(g5)$name
+
+
+V(g5)$color <- c("pink", "pink", "lightgreen")
+V(g5)$size <- degree(g5)*10
+plot(g5)
+degree(g5)
+
+
+CDKN2A <- file.path('CDKN2A.txt') %>% read.delim(na.strings = '')
+CDKN2A <- CDKN2A[,c("x.nodel","node2","combined_score")] #just keep PPI and score
+cdkn2a <- graph.data.frame(CDKN2A,directed=FALSE)
+plot(cdkn2a)
+
+get_gstatistics <- function(gt) {
+  gstats <- data.frame(
+    modularity=modularity(walktrap.community(gt)),
+    avepath=average.path.length(gt),
+    nedges=ecount(gt),
+    nverts=vcount(gt),
+    transit=transitivity(gt),
+    avedegree=mean(degree(gt)),
+    diameter=diameter(gt,weights=NA),
+    connect=is.connected(gt),
+    closeness=closeness(gt),
+    betweenness=betweenness(gt,directed=FALSE),
+    density=graph.density(gt),
+    hubness=hub.score(gt)$vector)
+  #authority=authority.score(gt)$vector)
+  #power=bonpow(gt))
+  return(gstats)
+}
+
+get_gstatistics(cdkn2a)
+
+results <- get_gstatistics(cdkn2a)
+
+head(results)
+
+results <- arrange(results,desc(hubness))
+
+head(results)
+
+#Example Zachery Karate Club
+
+install.packages("igraphdata")
+
+library(igraph)
+library(igraphdata)
+
+data(karate)
+summary(karate)
+
+plot(karate)
+
+vertex_attr(karate, "Faction")
+table(vertex_attr(karate, "Faction"))
+
+
+cfg <- cluster_fast_greedy(karate)
+plot(cfg, karate)
+
+cutat(cfg, 2)
+
+plot(structure(list(membership=cutat(cfg, 2)), class="communities"), karate)
