@@ -1,0 +1,168 @@
+#Set Working Directory
+setwd("~/Documents/DATA SCIENCE MODULES/CETM24/ASSIGNMENTS")
+#InstallLibraries
+install.packages("ranger")
+install.packages("caret")
+install.packages("data.table")
+install.packages("corrplot")
+install.packages("reshape2")
+install.packages("e1071")
+install.packages("precrec")
+install.packages("gmodels")
+#LoadLibraries
+
+library(ranger) # a fast implementation method for Random Forests
+library(caret) #for sampling
+library(data.table)
+library(dplyr) #For data manipulation
+library(caTools) #for train/test split
+library(ggplot2) #for data visualization
+library(corrplot) #Graphical display of a Correlation Matrix, confidence interval.
+library(reshape2) #For restructuring data and aggregating data using the melt or dcast function
+library(leaps) #Regression subset selection
+library(e1071) #Includes the function for the SVM Classifier
+library(precrec) # Provides accurate computations of ROC and Precision Recall Curves
+library(gmodels) #Model Fitting Package
+library(readr) #part of tidyverse for reading rectangular databases
+
+#Import DataSet into R Studio
+
+creditcard_data <- read_csv("creditcard.csv", col_types = list(Time =col_number()))
+creditcard_data$Class <- factor(creditcard_data$Class)
+
+#Data Exploration
+
+dim(creditcard_data) #dim function used to get the dimensions of a dataframe
+head(creditcard_data) #displays the first 5 rows of the dataframe
+
+tail(creditcard_data) #displays the last 5 rows of the dataframe
+
+table(creditcard_data$Class)
+summary(creditcard_data$Amount)
+names(creditcard_data)
+var(creditcard_data$Amount)
+
+sd(creditcard_data$Amount)
+
+names(creditcard_data) #Gives the column names for each features
+
+#Checking for NULL values aka Missing Values
+
+sapply(creditcard_data, function(x) sum(is.na(x)))
+
+
+#Prints A Summary for all the features in the dataset
+summary(creditcard_data) 
+
+#Checks for the datatype for each Column in the DataFrame
+
+str(creditcard_data)
+
+#Visualizing Distributions
+
+qplot(creditcard_data$Time)
+
+#Plot by Class
+
+ggplot(creditcard_data,aes(x=Class, y=Amount,group=Class))+
+  geom_boxplot()+
+  ggtitle("Amount by Class") #This Graph Would Show that the fraud transactions are usually of a much lower value
+#SourceCode https://www.kaggle.com/josephgpinto/credit-card-fraud-detection-prediction 
+
+
+#A better Visualization of the Distribution By the Amount
+
+ggplot(data,aes(x=log(Amount)))+
+  geom_histogram(aes(y=..density..),binwidth=.100,
+                 colour="black", fill="white")+
+  geom_density(alpha =0.2,adjust=0.25,fill="#FF6666")+
+  ggtitle("Distribution of Amount")
+#SourceCode https://www.kaggle.com/josephgpinto/credit-card-fraud-detection-prediction 
+
+#Visualization and inspection
+
+correlations <- cor(creditcard_data[,1:29], method="pearson")
+corrplot(correlations, number.cex = .9, method = "circle", type = "full", tl.cex=0.8, tl.col = "black")
+
+#Because The above are PCA, not expecting to see high correlation between the features
+
+#Density Distribution of Fraud and Regular Classes
+
+ggplot(creditcard_data, aes(Amount, fill = Class) ) +
+  geom_density(alpha =0.5, col ="black") +
+  geom_vline(
+    data = df_summarized,
+    aes(colour = Class, linetype =variable, xintercept=value),
+    show.legend = TRUE
+  ) +
+  scale_fill_discrete(labels = c("Regular", "Fraud"))+
+  scale_linetype_discrete(labels =c(amount_mean = "mean", amount_median = "median") ) +
+  scale_color_discrete(breaks =NULL) +
+  xlim(0, mean(creditcard_data$Amount) +2*sd(creditcard_data$Amount)) +
+  labs(linetype = "Stats",
+       title = "Density distribution of Fraud and Regular classes",
+       subtitle = expression("x axis limited at" ~mu+2*sigma~ "for better visualization")) +
+  ylab("Frequency")+
+  theme(
+    axis.title.y = element_text(),
+    plot.caption = element_text(margin = margin(t =15), color = "gray30", size = 10)
+  )
+
+#Conditional Probability using Baysian Networks
+
+bn_df <- data.frame(creditcard_data)
+res <- hc(bn_df)
+plot(res)
+
+
+
+#Scaling and splitting into train and test set
+
+set.seed(110)
+
+#Split
+split <- sample.split(creditcard_data$Class, SplitRatio = 0.9)
+training_set <- creditcard_data[split,]
+test_set <- creditcard_data[!split,]
+
+#Scale
+
+scaler <- preProcess(training_set, method = "scale")
+scaled_training <- predict(scaler, training_set)
+scaled_test <- predict(scaler, test_set)
+
+dim(scaled_training)
+dim(scaled_test)
+
+
+#SVM Classifier Training
+
+svm_clf <- svm(Class ~.,
+               data = scaled_training,
+               method = "radial",
+               type = 'C-classification')
+svm_pred <- predict (svm_clf, newdata = scaled_test)
+svm_pred_obj <- precrec::mmdata(as.numeric(svm_pred), test_set$Class)
+
+#Confusion Matrix
+svm_conf_mat <- CrossTable(svm_pred, test_set$Class,prop.chisq = FALSE, prop.t = FALSE,dnn = c('predicted', 'actual'))
+
+#Assessing the performance AUC
+
+svm_performance <- precrec::evalmod(svm_pred_obj)
+svm_performance
+
+
+#Showing the ROC and Precision-Recall curves
+
+autoplot(svm_performance)
+
+# Visualising the Training set results
+summary(svm_clf)
+
+#Plotting the SVM Classification graph
+ggplot(scaled_training)+ geom_point(aes(x = Amount, y= Time, color=factor(Class), shape=factor(Class)), size=5)
+
+#Data with SVM model
+
+plot(svm_clf, scaled_training, V1~V28)
